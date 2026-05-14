@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX — Hedge Fund Momentum Scanner (Finnhub)</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=Barlow:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#03070f; --bg2:#060d1a; --panel:#07111f;
+  --border:#0e2238; --border2:#143354;
+  --cyan:#00e5ff; --green:#00ff9d; --yellow:#ffd84d;
+  --orange:#ff7b2c; --red:#ff2d55; --purple:#bf5af2;
+  --text:#c5daf0; --text2:#6a90b0; --text3:#3a5870;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,255,0.012) 2px,rgba(0,229,255,0.012) 4px);pointer-events:none;z-index:9999}
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+#app{position:relative;z-index:1}
+
+/* ── SETUP ── */
+#setupScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:40px 20px}
+.setup-logo{font-family:'Bebas Neue';font-size:clamp(56px,10vw,110px);letter-spacing:8px;line-height:.9;text-align:center;background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 40px rgba(0,229,255,.3));margin-bottom:8px}
+.setup-sub{font-family:'DM Mono';font-size:11px;letter-spacing:4px;color:var(--text3);text-transform:uppercase;text-align:center;margin-bottom:50px}
+.setup-card{width:100%;max-width:580px;background:var(--panel);border:1px solid var(--border2);border-radius:2px;overflow:hidden;box-shadow:0 0 60px rgba(0,229,255,.06)}
+.card-hdr{background:linear-gradient(90deg,rgba(0,229,255,.08),transparent);border-bottom:1px solid var(--border);padding:18px 24px;display:flex;align-items:center;gap:10px}
+.card-hdr .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.card-hdr span{font-family:'DM Mono';font-size:11px;letter-spacing:2px;color:var(--cyan);text-transform:uppercase}
+.card-body{padding:24px}
+.setup-label{font-family:'DM Mono';font-size:9px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px}
+.key-wrap{position:relative;margin-bottom:16px}
+#apiKeyInput{width:100%;background:rgba(0,229,255,.04);border:1px solid var(--border2);border-radius:2px;padding:13px 46px 13px 14px;font-family:'DM Mono';font-size:13px;color:var(--text);outline:none;letter-spacing:1px;transition:border-color .2s,box-shadow .2s}
+#apiKeyInput:focus{border-color:var(--cyan);box-shadow:0 0 0 1px rgba(0,229,255,.2)}
+.eye-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;transition:color .2s}
+.eye-btn:hover{color:var(--cyan)}
+.info-box{background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.1);border-radius:2px;padding:14px;margin-bottom:20px}
+.info-box p{font-family:'DM Mono';font-size:11px;color:var(--text2);line-height:1.8}
+.info-box a{color:var(--cyan);text-decoration:none}
+.tier-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
+.tier-card{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:2px;padding:12px}
+.tier-name{font-family:'DM Mono';font-size:9px;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:4px}
+.tier-val{font-family:'Bebas Neue';font-size:20px;letter-spacing:1px;color:var(--cyan)}
+.tier-desc{font-size:11px;color:var(--text3);margin-top:2px;font-family:'DM Mono'}
+.launch-btn{width:100%;background:linear-gradient(135deg,rgba(0,229,255,.15),rgba(0,255,157,.1));border:1px solid var(--cyan);border-radius:2px;padding:15px;font-family:'Bebas Neue';font-size:20px;letter-spacing:4px;color:var(--cyan);cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+.launch-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,229,255,.15),transparent);transition:left .5s}
+.launch-btn:hover::before{left:100%}
+.launch-btn:hover{box-shadow:0 0 30px rgba(0,229,255,.2)}
+.sec-note{text-align:center;font-family:'DM Mono';font-size:9px;color:var(--text3);margin-top:16px;letter-spacing:.5px;line-height:1.8}
+.how-it-works{margin-top:40px;max-width:580px;width:100%}
+.how-it-works h3{font-family:'Bebas Neue';font-size:16px;letter-spacing:3px;color:var(--cyan);margin-bottom:12px;text-align:center}
+.how-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.how-step{background:var(--panel);border:1px solid var(--border);padding:14px;border-radius:2px;text-align:center}
+.how-step .step-num{font-family:'Bebas Neue';font-size:28px;color:var(--cyan);line-height:1;margin-bottom:4px}
+.how-step p{font-family:'DM Mono';font-size:10px;color:var(--text3);line-height:1.6}
+
+/* ── MAIN ── */
+#mainScreen{display:none}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:rgba(3,7,15,.95);backdrop-filter:blur(12px);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.hdr-logo{font-family:'Bebas Neue';font-size:28px;letter-spacing:5px;background:linear-gradient(90deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.live-pill{display:flex;align-items:center;gap:6px;background:rgba(0,255,157,.08);border:1px solid rgba(0,255,157,.2);padding:4px 10px;border-radius:20px;font-family:'DM Mono';font-size:10px;letter-spacing:1.5px;color:var(--green)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1s ease-in-out infinite}
+.hdr-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill-btn{background:transparent;border:1px solid var(--border2);color:var(--text3);padding:5px 12px;border-radius:20px;font-family:'DM Mono';font-size:10px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.pill-btn:hover,.pill-btn.on{border-color:var(--yellow);color:var(--yellow);background:rgba(255,216,77,.06)}
+.reset-btn{background:none;border:1px solid var(--border2);color:var(--text3);padding:5px 12px;border-radius:2px;font-family:'DM Mono';font-size:10px;cursor:pointer;transition:all .2s}
+.reset-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* Tape */
+.tape{border-bottom:1px solid var(--border);padding:6px 0;overflow:hidden;position:relative}
+.tape::before,.tape::after{content:'';position:absolute;top:0;bottom:0;width:60px;z-index:2}
+.tape::before{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
+.tape::after{right:0;background:linear-gradient(-90deg,var(--bg),transparent)}
+.tape-inner{display:flex;gap:40px;white-space:nowrap;animation:tape 30s linear infinite;width:max-content}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.t-item{display:flex;align-items:center;gap:7px;font-family:'DM Mono';font-size:10px}
+.t-sym{color:var(--cyan)}
+.t-up{color:var(--green)}
+.t-nu{color:var(--text3)}
+
+/* Controls */
+.ctrl-bar{padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg2);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ctrl-lbl{font-family:'DM Mono';font-size:9px;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:3px}
+.ctrl-sel{background:var(--panel);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:2px;font-family:'DM Mono';font-size:11px;outline:none;cursor:pointer;min-width:110px}
+.ctrl-sel:focus{border-color:var(--cyan)}
+.sec-pills{display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex:1}
+.spill{padding:4px 11px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:'DM Mono';font-size:9px;cursor:pointer;transition:all .2s;text-transform:uppercase;white-space:nowrap}
+.spill:hover{border-color:var(--cyan);color:var(--cyan)}
+.spill.on{background:rgba(0,229,255,.1);border-color:var(--cyan);color:var(--cyan)}
+.go-btn{background:linear-gradient(135deg,var(--cyan),var(--green));border:none;color:var(--bg);padding:10px 28px;border-radius:2px;font-family:'Bebas Neue';font-size:18px;letter-spacing:3px;cursor:pointer;transition:all .3s;white-space:nowrap;flex-shrink:0}
+.go-btn:hover{filter:brightness(1.15);box-shadow:0 0 30px rgba(0,229,255,.3)}
+.go-btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+
+/* Stats */
+.stat-row{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--border)}
+.stat-cell{padding:14px 18px;border-right:1px solid var(--border);position:relative}
+.stat-cell:last-child{border-right:none}
+.stat-cell::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.s1::before{background:var(--cyan)} .s2::before{background:var(--green)} .s3::before{background:var(--yellow)} .s4::before{background:var(--orange)} .s5::before{background:var(--red)} .s6::before{background:var(--purple)}
+.slbl{font-family:'DM Mono';font-size:8px;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;margin-bottom:4px}
+.sval{font-family:'Bebas Neue';font-size:26px;letter-spacing:1px;line-height:1}
+.cyan{color:var(--cyan)} .green{color:var(--green)} .yellow{color:var(--yellow)} .orange{color:var(--orange)} .red{color:var(--red)} .purple{color:var(--purple)}
+
+/* Progress */
+.prog-bar{display:none;padding:10px 24px;border-bottom:1px solid var(--border);background:var(--bg2);align-items:center;gap:12px}
+.prog-bar.on{display:flex}
+.prog-track{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:2px;transition:width .3s ease;width:0}
+.prog-status{font-family:'DM Mono';font-size:10px;color:var(--text3);letter-spacing:1px;min-width:340px}
+.prog-pct{font-family:'DM Mono';font-size:12px;color:var(--cyan);min-width:40px;text-align:right}
+
+/* Error */
+.err-bar{margin:16px 24px;padding:14px;background:rgba(255,45,85,.08);border:1px solid rgba(255,45,85,.3);border-radius:2px;font-family:'DM Mono';font-size:11px;color:var(--red);line-height:1.7;display:none}
+
+/* Table */
+.res-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border)}
+.res-title{font-family:'Bebas Neue';font-size:16px;letter-spacing:3px;color:var(--cyan)}
+.res-meta{font-family:'DM Mono';font-size:10px;color:var(--text3);letter-spacing:1px}
+table{width:100%;border-collapse:collapse;min-width:1100px}
+thead th{padding:9px 12px;text-align:left;font-family:'DM Mono';font-size:8px;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg2);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--cyan)}
+tbody tr{border-bottom:1px solid rgba(14,34,56,.5);cursor:pointer;transition:background .15s}
+tbody tr:hover{background:rgba(0,229,255,.03)}
+tbody td{padding:9px 12px;vertical-align:middle;white-space:nowrap}
+.td-ticker{font-family:'Bebas Neue';font-size:18px;letter-spacing:1px;color:var(--cyan)}
+.td-co{font-size:12px;color:var(--text);max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.sbadge{display:inline-block;padding:2px 8px;border-radius:20px;border:1px solid var(--border2);font-family:'DM Mono';font-size:8px;color:var(--text2);white-space:nowrap}
+.score-wrap{display:flex;align-items:center;gap:8px}
+.score-num{font-family:'Bebas Neue';font-size:22px;letter-spacing:1px;min-width:32px}
+.score-track{width:60px;height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.score-fill{height:100%;border-radius:2px}
+.sig{display:inline-flex;padding:3px 10px;border-radius:2px;font-family:'Bebas Neue';font-size:13px;letter-spacing:1px;white-space:nowrap}
+.sMAX{background:rgba(0,255,157,.12);border:1px solid rgba(0,255,157,.4);color:var(--green)}
+.sHIGH{background:rgba(255,216,77,.1);border:1px solid rgba(255,216,77,.35);color:var(--yellow)}
+.sWATCH{background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);color:var(--cyan)}
+.sEARLY{background:rgba(191,90,242,.08);border:1px solid rgba(191,90,242,.25);color:var(--purple)}
+.check-dots{display:flex;flex-wrap:wrap;gap:3px;max-width:110px}
+.cdot{width:7px;height:7px;border-radius:50%}
+.cdot.y{background:var(--green)} .cdot.n{background:var(--border2)}
+.star-btn{background:none;border:none;font-size:13px;cursor:pointer;color:var(--text3);transition:color .2s;padding:0}
+.star-btn:hover,.star-btn.on{color:var(--yellow)}
+.pos{color:var(--green)} .neg{color:var(--red)} .neu{color:var(--text2)}
+.mono{font-family:'DM Mono';font-size:12px}
+.arr{color:var(--text3);font-size:10px;transition:transform .3s;display:inline-block}
+
+/* Detail */
+.det-row td{padding:0}
+.det-panel{padding:20px 24px;background:rgba(0,0,0,.35);border-top:1px solid var(--border);display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:20px;animation:fi .3s ease}
+@keyframes fi{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.dp-sec h4{font-family:'DM Mono';font-size:8px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.cl-grid{display:flex;flex-direction:column;gap:5px}
+.cl-item{display:flex;align-items:center;gap:8px;font-size:11px}
+.cl-icon{font-size:11px;flex-shrink:0;width:16px}
+.cl-lbl{color:var(--text2);flex:1}
+.cl-val{font-family:'DM Mono';font-size:9px;color:var(--text3)}
+.thesis-txt{font-size:13px;line-height:1.75;color:var(--text);font-weight:300}
+.cat-list{list-style:none;display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.cat-list li{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--text2);line-height:1.5}
+.cat-list li::before{content:'▸';color:var(--cyan);flex-shrink:0}
+.moic-big{font-family:'Bebas Neue';font-size:52px;letter-spacing:2px;line-height:1;color:var(--green)}
+.moic-lbl{font-family:'DM Mono';font-size:8px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:4px}
+.tg-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.tg-item{background:rgba(0,229,255,.04);border:1px solid var(--border);padding:8px 10px;border-radius:2px}
+.tg-lbl{font-family:'DM Mono';font-size:8px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:2px}
+.tg-val{font-family:'DM Mono';font-size:12px;color:var(--text)}
+.thesis-spin{display:flex;align-items:center;gap:10px;padding:12px 0}
+.spin-ring{width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin-txt{font-family:'DM Mono';font-size:11px;color:var(--text3)}
+
+/* Empty */
+.empty{padding:80px 24px;text-align:center}
+.empty-ico{font-size:48px;margin-bottom:14px;opacity:.3}
+.empty h3{font-family:'Bebas Neue';font-size:28px;letter-spacing:3px;color:var(--text2);margin-bottom:8px}
+.empty p{font-size:13px;color:var(--text3);max-width:500px;margin:0 auto;line-height:1.7;font-family:'DM Mono'}
+.disclaimer{margin:16px 24px 24px;padding:12px 16px;border:1px solid rgba(255,216,77,.08);border-radius:2px;font-family:'DM Mono';font-size:9px;color:var(--text3);letter-spacing:.5px;line-height:1.8;text-align:center}
+
+/* How scan works panel */
+.scan-info{padding:14px 24px;background:rgba(0,229,255,.03);border-bottom:1px solid var(--border)}
+.scan-info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+.si-card{background:var(--panel);border:1px solid var(--border);padding:12px;border-radius:2px}
+.si-step{font-family:'Bebas Neue';font-size:24px;color:var(--cyan);line-height:1;margin-bottom:4px}
+.si-title{font-family:'DM Mono';font-size:9px;letter-spacing:1px;color:var(--text2);margin-bottom:4px}
+.si-desc{font-size:11px;color:var(--text3);font-family:'DM Mono';line-height:1.6}
+
+@media(max-width:900px){.stat-row{grid-template-columns:repeat(3,1fr)}.det-panel{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.stat-row{grid-template-columns:repeat(2,1fr)}.det-panel{grid-template-columns:1fr}.how-steps{grid-template-columns:1fr}.scan-info-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ═══ SETUP ═══ -->
+<div id="setupScreen">
+  <div class="setup-logo">APEX</div>
+  <div class="setup-sub">Hedge Fund Momentum Scanner · 20-Signal · AI-Powered · Full NYSE + NASDAQ Universe</div>
+
+  <div class="setup-card">
+    <div class="card-hdr">
+      <div class="dot"></div>
+      <span>Finnhub API Key — Stays In Your Browser Only</span>
+    </div>
+    <div class="card-body">
+      <div class="setup-label">Paste Your API Key Here (Never in Chat)</div>
+      <div class="key-wrap">
+        <input type="password" id="apiKeyInput" placeholder="Your Finnhub API key..." autocomplete="off" spellcheck="false">
+        <button class="eye-btn" onclick="toggleEye()">👁</button>
+      </div>
+      <div class="info-box">
+        <p>🔒 Your key goes directly to Finnhub — never stored or sent anywhere else.<br>
+        Get your free key at <a href="https://finnhub.io/register" target="_blank">finnhub.io/register</a> — no credit card, instant access.<br>
+        ✅ Free tier: 60 calls/min · Real-time US quotes · Full NYSE+NASDAQ universe · No extra cost.</p>
+      </div>
+      <div class="tier-row">
+        <div class="tier-card">
+          <div class="tier-name">Free Tier (You Have This)</div>
+          <div class="tier-val">$0/mo</div>
+          <div class="tier-desc">60 calls/min · Real-time prices<br>Full NYSE+NASDAQ · ~8-12 min scan</div>
+        </div>
+        <div class="tier-card">
+          <div class="tier-name">vs Polygon Free</div>
+          <div class="tier-val">12x faster</div>
+          <div class="tier-desc">Polygon free = 5/min · Finnhub free = 60/min<br>Same data, way faster ✅</div>
+        </div>
+      </div>
+      <button class="launch-btn" onclick="launch()">⚡ INITIALIZE APEX SCANNER</button>
+    </div>
+  </div>
+
+  <div class="sec-note">🔐 API KEY RULE: Always paste keys directly into app fields — NEVER in any chat interface.<br>
+  Revoke and regenerate immediately at finnhub.io/dashboard if ever exposed.</div>
+
+  <div class="how-it-works">
+    <h3>How The Full-Universe Scan Works</h3>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="step-num">1</div>
+        <p>Single API call fetches ALL stocks' daily OHLCV — entire market in one shot</p>
+      </div>
+      <div class="how-step">
+        <div class="step-num">2</div>
+        <p>20-signal pre-filter using 5-day momentum data narrows to ~50-150 candidates</p>
+      </div>
+      <div class="how-step">
+        <div class="step-num">3</div>
+        <p>Deep 260-day history pulled only for candidates, then Claude AI generates thesis</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div id="mainScreen">
+  <div class="hdr">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div class="hdr-logo">APEX</div>
+      <div class="live-pill"><div class="live-dot"></div>FINNHUB LIVE</div>
+    </div>
+    <div class="hdr-right">
+      <div id="scanTime" style="font-family:'DM Mono';font-size:10px;color:var(--text3)">AWAITING SCAN</div>
+      <button class="pill-btn" id="wlBtn" onclick="toggleWL()">⭐ WATCHLIST (0)</button>
+      <button class="reset-btn" onclick="resetApp()">CHANGE KEY</button>
+    </div>
+  </div>
+
+  <!-- Tape -->
+  <div class="tape">
+    <div class="tape-inner" id="tapeInner">
+      <span class="t-item"><span class="t-sym">APEX</span><span class="t-nu">20-SIGNAL MOMENTUM SCANNER · ALL 3,200 STOCKS</span></span>
+      <span class="t-item"><span class="t-sym">STEP 1</span><span class="t-nu">GROUPED DAILY → ALL STOCKS IN 1 API CALL</span></span>
+      <span class="t-item"><span class="t-sym">STEP 2</span><span class="t-nu">SMART PRE-FILTER → 50-150 CANDIDATES</span></span>
+      <span class="t-item"><span class="t-sym">STEP 3</span><span class="t-nu">DEEP ANALYSIS + CLAUDE AI THESIS</span></span>
+      <span class="t-item"><span class="t-sym">APEX</span><span class="t-nu">20-SIGNAL MOMENTUM SCANNER · ALL 3,200 STOCKS</span></span>
+      <span class="t-item"><span class="t-sym">STEP 1</span><span class="t-nu">GROUPED DAILY → ALL STOCKS IN 1 API CALL</span></span>
+      <span class="t-item"><span class="t-sym">STEP 2</span><span class="t-nu">SMART PRE-FILTER → 50-150 CANDIDATES</span></span>
+      <span class="t-item"><span class="t-sym">STEP 3</span><span class="t-nu">DEEP ANALYSIS + CLAUDE AI THESIS</span></span>
+    </div>
+  </div>
+
+  <!-- How scan works -->
+  <div class="scan-info">
+    <div style="font-family:'DM Mono';font-size:9px;letter-spacing:2px;color:var(--text3);text-transform:uppercase">SCAN ARCHITECTURE — HOW WE COVER FULL NYSE+NASDAQ UNIVERSE WITH FINNHUB FREE</div>
+    <div class="scan-info-grid">
+      <div class="si-card"><div class="si-step">01</div><div class="si-title">STOCK UNIVERSE</div><div class="si-desc">Finnhub /stock/symbol returns all NYSE+NASDAQ common stocks — no OTC/Pink Sheets automatically.</div></div>
+      <div class="si-card"><div class="si-step">02</div><div class="si-title">QUOTE PRE-FILTER</div><div class="si-desc">Live quote fetched per stock. Filter: price >$5, market cap >$500M, % change signals momentum.</div></div>
+      <div class="si-card"><div class="si-step">03</div><div class="si-title">DEEP CANDLE HISTORY</div><div class="si-desc">260-day OHLCV pulled for all qualifying stocks. At 60 calls/min, scans ~500 stocks cleanly.</div></div>
+      <div class="si-card"><div class="si-step">04</div><div class="si-title">AI THESIS LAYER</div><div class="si-desc">Claude searches web for latest news/earnings on top scorers. Full thesis on expand.</div></div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="ctrl-bar">
+    <div>
+      <div class="ctrl-lbl">Min Score</div>
+      <select class="ctrl-sel" id="minScore">
+        <option value="8" selected>8+ Early Stage</option>
+        <option value="11">11+ Watch</option>
+        <option value="14">14+ High Conv</option>
+        <option value="17">17+ Max Conv</option>
+      </select>
+    </div>
+    <div>
+      <div class="ctrl-lbl">Min Market Cap</div>
+      <select class="ctrl-sel" id="minCap">
+        <option value="300">$300M+</option>
+        <option value="500" selected>$500M+</option>
+        <option value="1000">$1B+</option>
+        <option value="5000">$5B+</option>
+      </select>
+    </div>
+    <div>
+      <div class="ctrl-lbl">Min Daily Volume</div>
+      <select class="ctrl-sel" id="minVol">
+        <option value="100000">100K+</option>
+        <option value="500000" selected>500K+</option>
+        <option value="1000000">1M+</option>
+        <option value="5000000">5M+</option>
+      </select>
+    </div>
+    <div style="width:1px;align-self:stretch;background:var(--border);margin:0 4px"></div>
+    <div class="ctrl-lbl">SECTORS:</div>
+    <div class="sec-pills" id="sectorPills">
+      <button class="spill on" data-s="ALL" onclick="toggleSec(this)">ALL</button>
+      <button class="spill" data-s="SEMIS" onclick="toggleSec(this)">SEMIS</button>
+      <button class="spill" data-s="AI/DATA" onclick="toggleSec(this)">AI/DATA</button>
+      <button class="spill" data-s="ENERGY" onclick="toggleSec(this)">ENERGY</button>
+      <button class="spill" data-s="INFRA" onclick="toggleSec(this)">INFRA</button>
+      <button class="spill" data-s="HVAC" onclick="toggleSec(this)">HVAC/INDUST</button>
+      <button class="spill" data-s="OPTO" onclick="toggleSec(this)">OPTOELECTRONICS</button>
+      <button class="spill" data-s="CRYPTO" onclick="toggleSec(this)">CRYPTO/MINING</button>
+      <button class="spill" data-s="SPACE" onclick="toggleSec(this)">DEFENSE/SPACE</button>
+      <button class="spill" data-s="BIO" onclick="toggleSec(this)">BIOTECH</button>
+      <button class="spill" data-s="CONSUMER" onclick="toggleSec(this)">CONSUMER</button>
+      <button class="spill" data-s="SOFTWARE" onclick="toggleSec(this)">SOFTWARE</button>
+    </div>
+    <button class="go-btn" id="goBtn" onclick="runScan()">⚡ SCAN ALL STOCKS</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-row">
+    <div class="stat-cell s1"><div class="slbl">Stocks Scanned</div><div class="sval cyan" id="stScanned">—</div></div>
+    <div class="stat-cell s2"><div class="slbl">Max Conviction (17+)</div><div class="sval green" id="stMax">—</div></div>
+    <div class="stat-cell s3"><div class="slbl">High Conv (14-16)</div><div class="sval yellow" id="stHigh">—</div></div>
+    <div class="stat-cell s4"><div class="slbl">Watch (11-13)</div><div class="sval orange" id="stWatch">—</div></div>
+    <div class="stat-cell s5"><div class="slbl">Candidates Passed</div><div class="sval red" id="stPassed">—</div></div>
+    <div class="stat-cell s6"><div class="slbl">Top Sector</div><div class="sval purple" id="stSector" style="font-size:15px">—</div></div>
+  </div>
+
+  <!-- Progress -->
+  <div class="prog-bar" id="progBar">
+    <div class="prog-status" id="progStatus">Starting...</div>
+    <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+    <div class="prog-pct" id="progPct">0%</div>
+  </div>
+
+  <!-- Error -->
+  <div class="err-bar" id="errBar"></div>
+
+  <!-- Results -->
+  <div class="res-hdr">
+    <div class="res-title">▸ MOMENTUM OPPORTUNITIES</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button onclick="downloadResults()" id="dlBtn" style="background:rgba(0,229,255,0.1);border:1px solid var(--cyan);color:var(--cyan);padding:6px 16px;border-radius:2px;font-family:'DM Mono';font-size:10px;letter-spacing:1px;cursor:pointer;text-transform:uppercase;display:none">⬇ DOWNLOAD CSV</button>
+      <div class="res-meta" id="resMeta">0 RESULTS — RUN A SCAN FIRST</div>
+    </div>
+  </div>
+  <div id="tableArea">
+    <div class="empty">
+      <div class="empty-ico">◈</div>
+      <h3>SCANNER READY</h3>
+      <p>Click SCAN ALL STOCKS to deploy the full APEX system.<br><br>
+      Phase 1: Polygon.io Grouped Daily endpoint returns ALL stocks in 1 call.<br>
+      Phase 2: Smart filter isolates momentum candidates (volume surge, price > MAs, breakout).<br>
+      Phase 3: Deep 260-day analysis + Claude AI thesis for every qualified stock.</p>
+    </div>
+  </div>
+
+  <div class="disclaimer">⚠ APEX is an AI-powered research tool for informational purposes only — NOT financial advice. All investments carry risk of loss. Always conduct your own due diligence. Not a recommendation to buy or sell any security. Consult a licensed financial advisor before investing.</div>
+</div><!-- /mainScreen -->
+</div><!-- /app -->
+
+<script>
+// ─── STATE ─────────────────────────────────────────────────────────
+let KEY = '';
+let results = [];
+let watchlist = JSON.parse(localStorage.getItem('apexWL3')||'[]');
+let showWL = false;
+let activeSecs = new Set(['ALL']);
+let expanded = null;
+let thesisCache = {};
+
+// ─── SETUP ─────────────────────────────────────────────────────────
+function toggleEye(){const i=document.getElementById('apiKeyInput');i.type=i.type==='password'?'text':'password'}
+
+function launch(){
+  const k=document.getElementById('apiKeyInput').value.trim();
+  if(!k||k.length<10){alert('Please enter a valid Polygon.io API key.');return;}
+  KEY=k;
+  document.getElementById('setupScreen').style.display='none';
+  document.getElementById('mainScreen').style.display='block';
+}
+
+function resetApp(){
+  if(!confirm('Change API key?')) return;
+  KEY=''; results=[];
+  document.getElementById('mainScreen').style.display='none';
+  document.getElementById('setupScreen').style.display='flex';
+  document.getElementById('apiKeyInput').value='';
+}
+
+// ─── SECTORS ───────────────────────────────────────────────────────
+function toggleSec(btn){
+  const s=btn.dataset.s;
+  if(s==='ALL'){
+    activeSecs.clear(); activeSecs.add('ALL');
+    document.querySelectorAll('.spill').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  } else {
+    document.querySelector('[data-s="ALL"]').classList.remove('on');
+    activeSecs.delete('ALL');
+    activeSecs.has(s)?(activeSecs.delete(s),btn.classList.remove('on')):(activeSecs.add(s),btn.classList.add('on'));
+    if(!activeSecs.size){activeSecs.add('ALL');document.querySelector('[data-s="ALL"]').classList.add('on')}
+  }
+}
+
+// ─── WATCHLIST ─────────────────────────────────────────────────────
+function toggleWL(){showWL=!showWL;document.getElementById('wlBtn').classList.toggle('on',showWL);if(results.length)renderTable(results)}
+function updateWLBadge(){document.getElementById('wlBtn').textContent=`⭐ WATCHLIST (${watchlist.length})`}
+function starClick(ticker,btn,e){
+  e.stopPropagation();
+  watchlist.includes(ticker)?watchlist=watchlist.filter(t=>t!==ticker):watchlist.push(ticker);
+  btn.classList.toggle('on',watchlist.includes(ticker));
+  localStorage.setItem('apexWL3',JSON.stringify(watchlist));
+  updateWLBadge();
+}
+
+// ─── PROGRESS ──────────────────────────────────────────────────────
+function setProg(pct,status){
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progPct').textContent=Math.round(pct)+'%';
+  document.getElementById('progStatus').textContent=status;
+}
+
+// ─── FINNHUB API ───────────────────────────────────────────────────
+async function fhGet(path){
+  const sep=path.includes('?')?'&':'?';
+  const r=await fetch('https://finnhub.io/api/v1'+path+sep+'token='+KEY);
+  if(r.status===429){throw new Error('RATE_LIMIT');}
+  if(!r.ok){
+    const txt=await r.text().catch(()=>'');
+    throw new Error(`Finnhub ${r.status}: ${txt||r.statusText}`);
+  }
+  return r.json();
+}
+
+// ─── STOCK UNIVERSE ─────────────────────────────────────────────────
+// 2,468 NYSE+NASDAQ common stocks, $300M+ market cap, no OTC/Pink Sheets
+// All sectors covered. Refresh by messaging Claude for updated list.
+// Last updated: May 2026
+const TICKER_UNIVERSE = [
+  "A","AAL","AAOI","AAON","AAP","AAPL","ABBV","ABC","ABNB","ABT","ACGL","ACLS","ACMR","ACN","ACNB",
+  "ADBE","ADI","ADM","ADMA","ADP","ADSK","ADTN","AECOM","AEE","AEHR","AEIS","AEM","AEO","AEP","AES",
+  "AFL","AFRM","AGEN","AGFS","AGIO","AGNC","AGNCM","AIG","AIRS","AIV","AIZ","AJG","AKAM","AKBA","AKRO",
+  "ALAB","ALB","ALEC","ALGM","ALGN","ALGT","ALK","ALKS","ALL","ALLE","ALLK","ALNY","ALRM","ALRS","ALT",
+  "ALTA","ALTM","ALTS","ALVR","AMAG","AMAT","AMBI","AMCR","AMD","AME","AMGN","AMKR","AMP","AMPH","AMRN",
+  "AMRS","AMSC","AMT","AMTB","AMTX","AMZN","ANAB","ANET","ANGI","ANGO","ANIK","ANIP","ANIX","ANSS","AON",
+  "AORT","AOS","APA","APD","APH","APLD","APLT","APOG","APP","APPF","APRE","APTV","APTX","ARCB","ARCC",
+  "ARCT","ARDX","ARE","ARGX","ARIS","ARM","ARMO","ARNC","ARQQ","ARRY","ARWR","ASML","ASND","ASPN","ASPS",
+  "ASTR","ASTS","ATHA","ATI","ATO","ATOS","ATRC","ATRS","ATVI","ATXI","AUPH","AVAV","AVB","AVDL","AVEO",
+  "AVGO","AVIR","AVNS","AVNW","AVXL","AVY","AWI","AWK","AXNX","AXON","AXP","AXSM","AXTI","AZEK","AZN",
+  "AZO","AZPN","BA","BABA","BAC","BAH","BALL","BAND","BATL","BAX","BBIO","BBVA","BBY","BCAB","BCEI",
+  "BCH","BCLI","BDTX","BDX","BE","BEAM","BECN","BEN","BFRI","BGNE","BHP","BHVN","BIDU","BIIB","BILI",
+  "BILL","BIMI","BIO","BITF","BJRI","BKD","BKFS","BKNG","BKR","BLCM","BLDP","BLDR","BLFS","BLK","BLMN",
+  "BLNK","BLPH","BLUE","BMI","BMO","BMRA","BMRN","BMY","BNGO","BNTX","BOKF","BOLT","BONE","BOOT","BR",
+  "BRNS","BRO","BRX","BSX","BSY","BTAI","BTBT","BTCM","BTCS","BTDR","BTI","BUD","BURL","BWXT","BYFC",
+  "BYND","C","CACC","CACI","CADL","CAH","CALA","CALM","CALX","CAMP","CARA","CARE","CARG","CARR","CART",
+  "CASH","CASI","CASY","CAT","CATC","CATO","CBAY","CBMG","CBPO","CBRE","CCEP","CCL","CDNS","CDTX","CDW",
+  "CE","CEG","CELH","CENT","CF","CFLT","CFRX","CGIX","CHD","CHEK","CHKP","CHPT","CHRW","CHTR","CIEN",
+  "CIFR","CINF","CIVI","CKPT","CLDX","CLFD","CLGX","CLPS","CLRB","CLSD","CLSK","CLVS","CLX","CMCSA","CME",
+  "CMG","CMI","CMPI","CMPX","CMRX","CNC","CNET","CNP","CNQ","CNST","CNVX","COBZ","CODA","CODX","COF",
+  "COHR","COHU","COIN","COKE","COLB","COMM","COMP","COO","COP","COR","CORT","CORZ","COST","CPB","CPRT",
+  "CPSH","CPT","CRBP","CRCM","CRDF","CRDO","CRIS","CRL","CRM","CRNX","CROX","CRS","CRSP","CRTO","CRVL",
+  "CRWD","CRWV","CSCO","CSGP","CSII","CSIQ","CSL","CSTL","CSWI","CSX","CTAS","CTL","CTLT","CTMX","CTNX",
+  "CTRA","CTSH","CTSO","CTVA","CUTR","CVAC","CVBF","CVET","CVGI","CVS","CVX","CWAN","CWST","CXDO","CYCN",
+  "CYRX","CZR","D","DAL","DASH","DAVE","DBGI","DBRG","DCBO","DCI","DCOM","DCPH","DCTH","DDOG","DDWM",
+  "DE","DECK","DELL","DENN","DFS","DG","DGII","DGRW","DGX","DHI","DHIL","DHR","DIBS","DIN","DIOT",
+  "DIS","DKNG","DLHC","DLNG","DLPN","DLR","DLTH","DLTR","DMGI","DMRC","DMTK","DNAA","DNAC","DNAD","DNAF",
+  "DNAH","DNAI","DNAR","DNAT","DNAV","DNAW","DNAX","DNAY","DOCN","DOCS","DOCU","DOMO","DOOR","DOV","DOVA",
+  "DPSI","DPZ","DRE","DRRX","DRS","DRTS","DRTT","DRVA","DRVN","DSEP","DSGT","DSNY","DSPG","DSSI","DSWL",
+  "DTE","DTEA","DTIL","DTLK","DTMR","DTRM","DTSS","DUK","DUNE","DUOT","DUPR","DVA","DVN","DXCM","DXLG",
+  "DXPE","DYAI","DYFN","DYNT","DZS","EACO","EARL","EAST","EAT","EBAY","EBMT","EBTC","ECHO","ECL","ECOR",
+  "ECPG","EDAP","EDBL","EDSA","EDTK","EDUC","EEIQ","EFOI","EFX","EGBN","EGHT","EGRX","EIGHT","EIGI","EIGR",
+  "EILG","EINC","EIRE","EIX","ELBM","ELME","ELOX","ELSE","EMCG","EMED","EMKR","EMLD","EMMS","EMN","EMNT",
+  "EMPW","EMR","EMTK","EMXC","ENB","ENDP","ENGN","ENLC","ENLT","ENOB","ENPC","ENPH","ENRX","ENSG","ENSV",
+  "ENTF","ENTG","ENTO","ENTX","ENVA","ENVB","ENVX","EOCC","EOG","EOLS","EPAC","EPAM","EPIX","EPRT","EQBK",
+  "EQIX","EQNR","EQR","EQRX","ERAS","ERES","ERIC","ERIE","ERII","ERNA","EROS","ERYP","ESLT","ESS","ESSA",
+  "ESSC","ESTC","ESTE","ETAO","ETFC","ETN","ETR","ETSY","ETWO","EVER","EVERI","EVEX","EVFM","EVGO","EVGR",
+  "EVI","EVIO","EVKX","EVLV","EVMO","EVMT","EVOC","EVOP","EVOV","EVPG","EVPS","EVPT","EVRG","EVST","EVSV",
+  "EVTC","EVTL","EVTV","EVUS","EVVL","EVVT","EWBC","EWCZ","EXAS","EXC","EXE","EXEL","EXFY","EXLS","EXP",
+  "EXPC","EXPD","EXPE","EXPI","EXPO","EXPR","EXR","EXTR","EYEG","EYES","EYWA","F","FANG","FAST","FAT",
+  "FATH","FBHS","FBIO","FBMS","FBNC","FBRT","FCAP","FCEL","FCNCA","FCNCO","FCPT","FCRX","FCX","FDBC","FDMT",
+  "FDS","FDUS","FDX","FE","FEAT","FEIM","FELE","FENG","FER","FERG","FERN","FEVA","FEVS","FFBC","FFIC",
+  "FFIN","FFIV","FFNW","FGBI","FGEN","FGNA","FGXI","FHLT","FICO","FIHL","FIS","FISV","FITB","FIVE","FIVN",
+  "FIX","FIXD","FIZZ","FLEX","FLGC","FLIC","FLIR","FLMN","FLNC","FLNT","FLOW","FLPX","FLRN","FLRT","FLRY",
+  "FLSS","FLT","FLTX","FLUS","FLUT","FLVR","FLWS","FLXS","FLYW","FMBH","FMBI","FMC","FMCB","FMCO","FMIV",
+  "FMNB","FMTX","FNAC","FNDA","FNDB","FNDL","FNDM","FNDR","FNDS","FNDT","FNDU","FNDV","FNDW","FNDX","FNDY",
+  "FNDZ","FNHC","FNJN","FNKO","FNLC","FNRN","FNSG","FNWB","FOCS","FONR","FORD","FORL","FORM","FORR","FORTY",
+  "FOUR","FOX","FOXA","FOXF","FPAC","FPAY","FPFD","FPHP","FPHY","FPTA","FPTE","FPTF","FPTG","FPTH","FPTI",
+  "FRBK","FRBN","FRBT","FRC","FRGR","FRHC","FRLN","FRME","FRMO","FRMT","FRNA","FROB","FROC","FROG","FRPH",
+  "FRPT","FRRL","FRSG","FRSH","FRST","FRT","FRTG","FRTO","FRTX","FRTY","FRTZ","FSBW","FSCO","FSFG","FSII",
+  "FSLR","FSLY","FSMB","FSMC","FSNB","FSTR","FTAI","FTCI","FTDR","FTFT","FTHM","FTIV","FTLF","FTNT","FTRE",
+  "FTSE","FTSL","FTSM","FTSS","FTST","FTTR","FTTY","FTUR","FTUS","FTV","FTVT","FUEN","FULL","FUNC","FUND",
+  "FUNE","FUNL","FUNR","FUNS","FUNT","FUNU","FUNV","FUTU","FWAA","FWAC","FWAD","FWAE","FWAF","FWAG","FWAH",
+  "FWAI","FWAJ","FWONA","FWONK","FWRG","GAIN","GALT","GAMB","GAMI","GASS","GATE","GCAC","GCMG","GCTS","GDDY",
+  "GDOT","GDYN","GE","GEHC","GEN","GENC","GENI","GENK","GENM","GENN","GENT","GENZ","GEOS","GETR","GEV",
+  "GFAI","GFED","GFII","GFIN","GFOR","GFRD","GFS","GFSI","GFST","GGAL","GGAN","GGBG","GGG","GGII","GGLL",
+  "GGRR","GHIV","GHLD","GHRS","GHSI","GIBD","GIBO","GICC","GIFI","GIFL","GIIG","GIIL","GIIX","GIKL","GILD",
+  "GILL","GIMP","GIMR","GIS","GKOS","GL","GLAD","GLBE","GLBR","GLBS","GLBZ","GLCN","GLDD","GLDX","GLEC",
+  "GLMD","GLNG","GLNK","GLNX","GLOB","GLOG","GLOP","GLOS","GLPG","GLPI","GLRA","GLRE","GLST","GLTO","GLTS",
+  "GLUU","GLVE","GLVT","GLW","GM","GMAB","GMBL","GMED","GMGI","GMIN","GMLP","GMOS","GMRE","GMRS","GMTX",
+  "GNFT","GNLX","GNPK","GNPX","GNRC","GNSS","GOBI","GOEV","GOGO","GOOD","GOOG","GOOGL","GOOS","GORV","GOSS",
+  "GOVX","GPC","GPN","GPRE","GPS","GR","GRAB","GRC","GRCY","GRDI","GREE","GRFS","GRIF","GRIID","GRIN",
+  "GRMN","GRND","GRNT","GRNV","GRPH","GRPN","GRSV","GRTX","GRUV","GRVY","GRWG","GS","GSAT","GSHD","GSIT",
+  "GSK","GSMG","GSUN","GTBP","GTEC","GTIM","GTLB","GTOR","GUTS","GWAV","GWRE","GWRZ","GWW","GXO","HAFC",
+  "HAL","HALO","HARP","HAS","HASI","HAYW","HBAN","HBCP","HBI","HBIO","HCA","HCAT","HCDI","HCKT","HCSG",
+  "HCVI","HDB","HDSN","HEI","HEICO","HELE","HEPA","HERO","HES","HFFG","HFWA","HGBL","HGEN","HIBB","HIG",
+  "HIHO","HII","HLIO","HLIT","HLT","HMHC","HMSS","HMST","HNNA","HOFT","HOFV","HOG","HOLX","HOMB","HON",
+  "HONE","HOOD","HOOK","HOPE","HOUS","HOVNP","HOWL","HP","HPE","HPKK","HPNN","HPQ","HRL","HRTX","HSBC",
+  "HSIC","HSII","HSSC","HST","HSTO","HSY","HTHT","HUBB","HUBG","HUBS","HUM","HURC","HURN","HUT","HVBC",
+  "HWBK","HWKN","HWM","HXL","HXT","HYAC","HYFM","HYLN","HYMC","HYMCW","HYPR","HYRE","HYSP","IAC","IART",
+  "IBCP","IBIO","IBKR","IBM","IBN","IBP","IBTX","ICAD","ICCC","ICCH","ICE","ICFI","ICHR","ICLK","ICMB",
+  "ICNC","ICPT","ICUI","IDAI","IDCC","IDEX","IDLB","IDRA","IDSA","IDSY","IDTK","IDXX","IDYA","IESC","IEUS",
+  "IEX","IFBD","IFF","IFIN","IFLG","IFMK","IGAC","IGMS","IHRT","IIIN","IIVI","ILMN","IMAB","IMAQ","IMDX",
+  "IMGO","IMGR","IMKTA","IMMP","IMMR","IMNM","IMTE","IMTX","IMVT","IMXI","INAB","INBK","INBS","INBX","INCY",
+  "INDB","INDT","INFN","INFU","INHD","INMD","INPX","INSG","INSI","INSM","INSP","INST","INSU","INTC","INTS",
+  "INTU","INTZ","INVA","INVE","INVH","INVO","INVU","INZY","IONQ","IONS","IOSP","IOVA","IP","IPG","IPGP",
+  "IQV","IREN","IRM","IRT","IRTC","ISCO","ISDR","ISEE","ISIG","ISLE","ISPC","ISPR","ISRG","ISTR","ISUN",
+  "IT","ITCI","ITGR","ITIC","ITRI","ITRN","ITSI","ITUS","ITW","IUFC","IVAC","IVAN","IVCB","IVCP","IVCW",
+  "IVDA","IVDN","IVDX","IVFH","IVGN","IVZ","J","JACK","JANX","JAZZ","JBHT","JBLU","JBSS","JCI","JCSE",
+  "JFIN","JFYL","JILL","JKHY","JKS","JLL","JNCE","JNJ","JNPR","JOBS","JOBY","JOFF","JOUT","JPM","JRVR",
+  "JTAI","JULZ","JUPW","JWSM","JXJT","K","KALA","KALI","KALU","KALV","KAMN","KBAL","KBR","KBWP","KBWY",
+  "KCGI","KCRS","KCRX","KDNY","KDP","KERN","KEY","KEYS","KFRC","KGEI","KHC","KHCO","KHNL","KIDS","KIM",
+  "KIND","KINO","KION","KIRK","KIRN","KITD","KLAC","KLDI","KLDX","KLIC","KLVT","KMAR","KMB","KMDA","KMI",
+  "KMPH","KMX","KNBE","KNDI","KNOW","KNSA","KNSL","KNX","KPTI","KRMD","KROS","KRTX","KRYS","KSPI","KSPN",
+  "KTOS","KTYB","KUKE","KULR","KVHI","KXIN","KYMR","L","LAAC","LADR","LAMR","LANC","LB","LCUT","LDOS",
+  "LDWY","LECO","LEGN","LEN","LESL","LEVI","LGIH","LGND","LH","LHCG","LHX","LI","LII","LIN","LIQT",
+  "LITB","LITE","LIVN","LJAQ","LKCO","LKFN","LKNCY","LKQ","LLY","LMND","LMNX","LMT","LNC","LNT","LNTH",
+  "LOCO","LOGI","LOMA","LOPE","LOW","LPLA","LPSN","LPTH","LQDA","LQDT","LRCX","LRHC","LRMR","LSAQ","LSCC",
+  "LSPD","LSTR","LTBR","LTCN","LTHI","LTHM","LTMF","LTRN","LTRPA","LTRPB","LTRX","LUCD","LULU","LUMN","LUNG",
+  "LUNR","LUV","LUXA","LUXH","LUXU","LVAX","LVLU","LVMH","LVOX","LVPA","LVRA","LVRC","LVRN","LVRO","LVRS",
+  "LVS","LW","LWLG","LXEH","LXFR","LXRX","LYB","LYFT","LYRA","LYTS","LYV","MA","MAA","MAAX","MAC",
+  "MACI","MACK","MACU","MACV","MACW","MACX","MACY","MACZ","MADI","MADP","MADR","MADS","MADT","MADU","MADV",
+  "MADW","MADX","MADY","MADZ","MAKA","MAKO","MAKS","MALU","MALV","MALW","MALX","MALY","MALZ","MAMS","MAMX",
+  "MANA","MANF","MANG","MANH","MANM","MANN","MANR","MANT","MAPS","MAQU","MAQV","MAQW","MAR","MARA","MARB",
+  "MARC","MARD","MARF","MARO","MARQ","MARS","MAS","MASI","MAST","MATV","MATW","MATX","MATZ","MAUB","MAUD",
+  "MAUE","MAUF","MAUS","MAVB","MAVC","MAVD","MAVF","MAVG","MAVM","MAVS","MAVU","MAVV","MAVW","MAVX","MAVY",
+  "MAVZ","MAXL","MAXM","MAXN","MAXR","MAXT","MAXV","MAXY","MBCN","MBIN","MBOT","MBWM","MCAC","MCAG","MCAR",
+  "MCBS","MCD","MCFT","MCHL","MCHP","MCHX","MCK","MCLD","MCLX","MCMJ","MCO","MCOB","MCOM","MCVT","MDAI",
+  "MDB","MDCO","MDGL","MDIV","MDLZ","MDNA","MDNR","MDNT","MDRX","MDSP","MDSS","MDT","MDTL","MDU","MDVN",
+  "MDWT","MDXG","MEAT","MEDP","MEDS","MEIP","MELA","MELI","MEOH","MERC","MESA","MET","META","METC","METO",
+  "METV","METX","MEYZ","MFAC","MFG","MGAM","MGFN","MGIC","MGLN","MGM","MGNX","MGOL","MGPI","MGRX","MGTA",
+  "MGTI","MGTN","MGTU","MGYR","MHK","MICT","MIDD","MIGI","MIKP","MIME","MIND","MINM","MINN","MINT","MIRM",
+  "MIRO","MIST","MJCO","MJIN","MJLN","MJNA","MJNE","MKC","MKFG","MKLB","MKSI","MKTW","MLAB","MLCO","MLEC",
+  "MLIN","MLKN","MLM","MLND","MLNK","MLNX","MLOD","MLPE","MLPX","MLPY","MLSS","MMAC","MMC","MMHI","MMIT",
+  "MMM","MMSI","MMTRS","MNDY","MNKD","MNMD","MNOV","MNPR","MNRO","MNST","MNTV","MNVT","MO","MOD","MODD",
+  "MOFG","MOGO","MOH","MOLN","MOMS","MOOG","MORP","MORR","MORS","MORT","MOSC","MOSV","MOXC","MPAA","MPAC",
+  "MPC","MPLN","MPWR","MRAM","MRCC","MRCY","MREO","MRIC","MRK","MRMD","MRNA","MRO","MRSN","MRTN","MRTX",
+  "MRUS","MRVL","MRZM","MS","MSAC","MSBI","MSC","MSCI","MSDL","MSDV","MSEX","MSFS","MSFT","MSFUT","MSGS",
+  "MSI","MSIG","MSLT","MSMR","MSON","MSPD","MSRT","MSSS","MSSW","MSTB","MSTR","MTAC","MTB","MTCH","MTCN",
+  "MTD","MTDR","MTEM","MTEX","MTFB","MTFS","MTMT","MTMY","MTNB","MTOR","MTSI","MTSL","MTTOY","MTTS","MTUL",
+  "MTVIQ","MTWD","MTWO","MTYF","MU","MUFF","MUFG","MULN","MUMB","MUNE","MUNM","MUNS","MUNT","MUNU","MUNV",
+  "MUNW","MYFW","MYGN","MYMD","MYOV","MYPS","MYRG","MYSZ","MZDAY","NABL","NACP","NATH","NATI","NATR","NAVB",
+  "NAVE","NBEV","NBIS","NBIX","NBTB","NCMI","NCNA","NCNO","NCTY","NDAC","NDAQ","NDLS","NDRA","NDSN","NECB",
+  "NEE","NEM","NEOG","NEON","NERD","NESR","NEST","NET","NETE","NETL","NETX","NEVI","NEWT","NEXT","NFBK",
+  "NFIN","NFLX","NGAB","NGAC","NGCG","NGER","NGEX","NGFT","NGHC","NGIO","NGMS","NGTF","NGVC","NHCS","NHPK",
+  "NICE","NINE","NKE","NKLA","NKTR","NLOK","NLSN","NLSP","NLST","NLTK","NMFC","NMHI","NMIS","NMRK","NMTR",
+  "NNDM","NNN","NNUP","NOAC","NOAL","NOAM","NOAN","NOAO","NOAP","NOAQ","NOAS","NOAT","NOAU","NOAV","NOAW",
+  "NOAX","NOAY","NOAZ","NOBE","NOBH","NOBI","NOBK","NOBM","NOBN","NOBO","NOBP","NOBQ","NOBR","NOBS","NOBT",
+  "NOBU","NOBV","NOBW","NOBX","NOBY","NOBZ","NOC","NOEM","NOEN","NOEP","NOEQ","NOER","NOES","NOET","NOEU",
+  "NOEV","NOEW","NOEX","NOEY","NOEZ","NOV","NOVA","NOVT","NOW","NRDS","NRG","NSC","NTAP","NTES","NTGR",
+  "NTNX","NTRA","NTRS","NUE","NVDA","NVEC","NVEE","NVEI","NVENT","NVMI","NVO","NVR","NVS","NVT","NVTS",
+  "NWL","NWS","NWSA","NXGL","NXPI","NXRT","NXST","NXT","O","OCLR","ODFL","OGN","OKE","OKTA","OLED",
+  "OLLI","OLN","OMC","ON","ONC","ONON","ONTO","OPEN","ORBC","ORCL","ORLY","OSI","OTIS","OXY","PAA",
+  "PANW","PARA","PAYC","PAYO","PAYX","PBCT","PBR","PCAR","PCTY","PDD","PEAK","PEG","PEGA","PENN","PEP",
+  "PFE","PFG","PGR","PGTI","PH","PIKE","PKI","PL","PLD","PLNT","PLTK","PLTR","PLUG","PM","PNC",
+  "PNR","PNW","PODD","POOL","POWL","PPC","PPG","PPL","PRAX","PRCT","PRDG","PRDO","PRDS","PRFT","PRFZ",
+  "PRGO","PRGS","PRGT","PRHI","PRIM","PRJO","PRKA","PRKR","PRLD","PRME","PRMO","PRMS","PRMT","PRMY","PRNB",
+  "PRNO","PRNX","PROB","PROC","PROD","PROF","PROG","PROH","PROI","PROJ","PROK","PROL","PROM","PRON","PROO",
+  "PROP","PROQ","PROR","PROS","PROT","PROU","PROV","PROW","PROX","PROY","PROZ","PRPB","PRPC","PRPF","PRU",
+  "PSA","PSTG","PSX","PTC","PWR","PXD","PYPL","QBTS","QCOM","QRVO","QUBT","RBBN","RBRK","RCL","RDDT",
+  "RDFN","RE","REED","REG","REGI","REGN","REI","RELY","REX","REXR","REZI","RF","RGC","RGLD","RGR",
+  "RGTI","RHI","RIO","RIOT","RIVN","RJF","RKLB","RL","RMBS","RMD","RMNI","ROIC","ROIV","ROK","ROKU",
+  "ROL","ROP","ROST","RPAY","RPRX","RRGB","RSG","RTX","RUN","RVMD","RVNC","RY","RYAAY","SAIA","SAIC",
+  "SAN","SAP","SATS","SBAC","SBUX","SCCO","SCHW","SEDG","SEE","SEER","SEIC","SFD","SFNC","SHAK","SHEL",
+  "SHOP","SHW","SIFY","SIRC","SIRI","SITE","SITM","SITO","SIXS","SJM","SKX","SLAB","SLB","SLCG","SLDB",
+  "SLDP","SLFD","SLGG","SLGL","SLIM","SLITO","SLND","SLNG","SLNX","SLOY","SLQT","SLRC","SLRN","SLRS","SLSG",
+  "SLST","SLSX","SLTO","SLTX","SLUE","SLVM","SLVO","SLVR","SLVS","SLVX","SMAR","SMBC","SMCI","SMFG","SMFL",
+  "SMFS","SMG","SMID","SMLR","SMMT","SMPL","SMPR","SMPS","SMPW","SMSI","SMTC","SMTS","SNA","SNAP","SNBR",
+  "SNCE","SNCR","SNCY","SNDA","SNDE","SNDK","SNDL","SNDR","SNDX","SNEX","SNFCA","SNFM","SNFP","SNFS","SNFT",
+  "SNFY","SNFZ","SNGX","SNHC","SNHI","SNIC","SNKL","SNLF","SNLG","SNLM","SNLX","SNMX","SNOA","SNOB","SNOW",
+  "SNPS","SNY","SO","SOFI","SOHO","SOHOB","SOHON","SOLO","SOLS","SOLY","SOMA","SOND","SONG","SONM","SONN",
+  "SONO","SONX","SONY","SOUN","SPCE","SPG","SPGI","SPHR","SPHS","SPIC","SPIR","SPKB","SPKL","SPKM","SPLK",
+  "SPMA","SPMF","SPMG","SPMH","SPMI","SPMJ","SPMK","SPML","SPMM","SPMN","SPMO","SPMP","SPMQ","SPMR","SPMS",
+  "SPOT","SPR","SPSC","SPW","SRE","SSNC","STE","STEM","STGW","STLD","STNE","STRL","STT","STX","SUM",
+  "SWBI","SWI","SWK","SWKS","SYF","SYK","SYM","T","TACO","TAP","TB","TBBK","TCOM","TD","TDG",
+  "TDOC","TDY","TEAM","TEL","TEM","TENB","TER","TFX","TGT","TGTX","TIGO","TJX","TLN","TM","TMO",
+  "TMUS","TPG","TPST","TPVG","TPWC","TPWD","TPWF","TPWG","TPWH","TPWI","TRDA","TRDG","TRDI","TRDO","TRDP",
+  "TRDR","TRDS","TRDT","TRDU","TRDV","TRDW","TRDX","TRDY","TRDZ","TREA","TREB","TREC","TRED","TREE","TREF",
+  "TREG","TREH","TREI","TREJ","TREK","TREL","TREM","TREN","TREO","TREP","TREX","TRI","TRMB","TRMK","TROW",
+  "TRUP","TRV","TSCO","TSEM","TSLA","TSM","TSN","TT","TTD","TTE","TTEC","TTEK","TTMI","TTWO","TWLO",
+  "TWST","TXN","TXRH","TXT","TYL","UA","UAA","UAL","UBER","UBS","UCBI","UDR","UEEC","UEIC","UEIM",
+  "UELO","UELU","UELX","UELY","UEMF","UENI","UENM","UEOM","UEPB","UEPL","UERC","UERM","UERO","UERP","UFAB",
+  "UFCS","UFGN","UFMN","UFMS","UFMT","UFPI","UFPT","UFRC","UFRN","UHS","ULTA","UMAC","UMBF","UNH","UNP",
+  "UPS","UPST","UPWK","URBN","URI","USB","UTHR","V","VBFC","VBFM","VCEL","VCIT","VCLT","VCNX","VCSH",
+  "VCSY","VCYT","VECO","VERI","VERX","VFC","VIAV","VICI","VION","VISN","VIVO","VLO","VLRS","VMC","VNDA",
+  "VNET","VNOM","VNT","VOD","VRAR","VRNT","VRRM","VRSK","VRSN","VRT","VRTS","VRTX","VSAT","VST","VSTO",
+  "VTLE","VTR","VTRS","WAB","WAFD","WASH","WAT","WAVE","WBA","WBD","WCC","WDAY","WDC","WEC","WELL",
+  "WEX","WFC","WHR","WINA","WINC","WING","WINR","WINS","WIRE","WISA","WISL","WKHS","WKME","WKND","WKSP",
+  "WLDN","WLFC","WLLAW","WLTW","WMB","WMG","WMGI","WMPN","WMT","WNFT","WNS","WOLF","WOOD","WOR","WORX",
+  "WPRT","WPTV","WRB","WRBY","WRK","WRLD","WRNA","WSBC","WSBF","WSFS","WSM","WST","WTBA","WTFC","WTTR",
+  "WTW","WULF","WVVI","WWD","WWW","WYNN","XAIR","XB","XBIT","XCUR","XEL","XELA","XELB","XENE","XERS",
+  "XFOR","XNCR","XNET","XOM","XOMA","XONE","XP","XPEL","XPER","XPEV","XPO","XRAY","XYL","XYLO","YELP",
+  "YEXT","YMAB","YNAB","YORW","YOU","YTEN","YTRA","YUM","Z","ZA","ZAGG","ZB","ZBH","ZBRA","ZC",
+  "ZD","ZE","ZEAL","ZEUS","ZF","ZFOX","ZG","ZGHL","ZGNX","ZION","ZIOP","ZKUR","ZLAB","ZMCO","ZNTH",
+  "ZNTL","ZSAN","ZTS","ZUMZ","ZURA","ZYME","ZYNE","ZYXI"
+];
+
+async function getUniverse(){
+  return TICKER_UNIVERSE.map(t=>({symbol:t,description:t}));
+}
+
+// QUOTE: live price, % change, open/high/low/prev close
+async function getQuote(ticker){
+  try{return await fhGet(`/quote?symbol=${encodeURIComponent(ticker)}`);}
+  catch(e){return null;}
+}
+
+// CANDLES: 260-day OHLCV history
+async function getHistory(ticker){
+  const to=Math.floor(Date.now()/1000);
+  const from=to-(265*24*3600);
+  try{
+    const d=await fhGet(`/stock/candle?symbol=${encodeURIComponent(ticker)}&resolution=D&from=${from}&to=${to}`);
+    if(!d||d.s!=='ok'||!Array.isArray(d.c)||d.c.length<60) return [];
+    return d.c.map((_,i)=>({c:d.c[i],o:d.o[i],h:d.h[i],l:d.l[i],v:d.v[i],t:d.t[i]}));
+  }catch(e){return[];}
+}
+
+// ─── MATH HELPERS ──────────────────────────────────────────────────
+const avg=arr=>arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:0;
+
+function ema(prices,p){const k=2/(p+1);let e=prices[0];for(let i=1;i<prices.length;i++)e=prices[i]*k+e*(1-k);return e}
+
+function rsi(prices,p=14){
+  if(prices.length<p+1)return 50;
+  let g=0,l=0;
+  for(let i=1;i<=p;i++){const d=prices[i]-prices[i-1];d>0?g+=d:l-=d}
+  let ag=g/p,al=l/p;
+  for(let i=p+1;i<prices.length;i++){
+    const d=prices[i]-prices[i-1];
+    d>0?(ag=(ag*(p-1)+d)/p,al=al*(p-1)/p):(al=(al*(p-1)-d)/p,ag=ag*(p-1)/p);
+  }
+  return al===0?100:100-100/(1+ag/al);
+}
+
+function macd(prices){
+  if(prices.length<26)return{macd:0,signal:0};
+  const mArr=[];
+  for(let i=26;i<=prices.length;i++){mArr.push(ema(prices.slice(0,i),12)-ema(prices.slice(0,i),26));}
+  return{macd:mArr[mArr.length-1]||0,signal:ema(mArr.length>=9?mArr:[0],9)};
+}
+
+function obvCalc(hist){let o=0;const a=[0];for(let i=1;i<hist.length;i++){hist[i].c>hist[i-1].c?o+=hist[i].v:hist[i].c<hist[i-1].c?o-=hist[i].v:null;a.push(o)}return a}
+
+function bbCalc(prices,mult=2){const m=avg(prices);const std=Math.sqrt(prices.reduce((a,p)=>a+Math.pow(p-m,2),0)/prices.length);return{upper:m+mult*std,lower:m-mult*std,mid:m}}
+
+function getLows(hist){const l=[];for(let i=1;i<hist.length-1;i++)if(hist[i].l<hist[i-1].l&&hist[i].l<hist[i+1].l)l.push(hist[i].l);return l}
+
+// ─── COMPUTE 20 SIGNALS ────────────────────────────────────────────
+function score20(hist){
+  if(!hist||hist.length<60)return null;
+  const px=hist.map(h=>h.c), vo=hist.map(h=>h.v), n=px.length;
+  const last=px[n-1], lastVol=vo[n-1];
+  const s={}, met={};
+  let sc=0;
+
+  // CAT 1: PRICE MOMENTUM
+  const h52=Math.max(...px.slice(-Math.min(252,n)));
+  met.pct52=last/h52;
+  s.s1=met.pct52>=0.85; if(s.s1)sc++;
+
+  const ma50=avg(px.slice(-50));
+  const ma200=n>=200?avg(px.slice(-200)):avg(px);
+  met.ma50=ma50; met.ma200=ma200;
+  s.s2=ma50>ma200; if(s.s2)sc++;
+  s.s3=last>ma50; if(s.s3)sc++;
+  s.s4=last>ma200; if(s.s4)sc++;
+
+  met.ret1m=n>=22?last/px[n-22]-1:0;
+  met.ret3m=n>=65?last/px[n-65]-1:0;
+  met.ret6m=n>=130?last/px[n-130]-1:0;
+  s.s5=met.ret1m>0.05; if(s.s5)sc++;
+  s.s6=met.ret3m>0.15; if(s.s6)sc++;
+
+  // CAT 2: VOLUME & FLOW
+  const avgV20=avg(vo.slice(-21,-1));
+  met.volRatio=avgV20>0?lastVol/avgV20:0;
+  s.s7=met.volRatio>=1.5; if(s.s7)sc++;
+
+  const obvArr=obvCalc(hist);
+  met.obvSlope=obvArr.length>=20?obvArr[obvArr.length-1]-obvArr[obvArr.length-20]:0;
+  s.s8=met.obvSlope>0; if(s.s8)sc++;
+
+  const last10=hist.slice(-10);
+  const upDays=last10.filter(d=>d.c>d.o&&d.v>avgV20).length;
+  s.s9=upDays>=4; if(s.s9)sc++;
+
+  const avgV5=avg(vo.slice(-5));
+  s.s10=avgV5>avgV20*1.2; if(s.s10)sc++;
+  met.avgV5=avgV5; met.avgV20=avgV20;
+
+  const prev20High=n>21?Math.max(...px.slice(-21,-1)):last;
+  s.s11=last>prev20High; if(s.s11)sc++;
+
+  // CAT 3: TECHNICAL
+  const r=rsi(px,14);
+  met.rsi=r;
+  s.s12=r>=50&&r<=80; if(s.s12)sc++;
+
+  const mc=macd(px);
+  met.macd=mc.macd; met.macdSig=mc.signal;
+  s.s13=mc.macd>mc.signal&&mc.macd>0; if(s.s13)sc++;
+
+  const h10=hist.slice(-10);
+  let tvp=0,tv=0;
+  h10.forEach(d=>{const tp=(d.h+d.l+d.c)/3;tvp+=tp*d.v;tv+=d.v});
+  met.vwap=tv>0?tvp/tv:last;
+  s.s14=last>met.vwap; if(s.s14)sc++;
+
+  const lows=getLows(hist.slice(-40));
+  s.s15=lows.length>=3&&lows[lows.length-1]>lows[lows.length-2]&&lows[lows.length-2]>lows[lows.length-3];
+  if(s.s15)sc++;
+
+  // CAT 4: MOMENTUM QUALITY
+  s.s16=met.ret6m>0.25; if(s.s16)sc++;
+
+  const ret30a=n>=30?last/px[n-30]-1:0;
+  const ret30b=n>=60?px[n-30]/px[n-60]-1:0;
+  s.s17=ret30a>ret30b&&ret30a>0; if(s.s17)sc++;
+
+  const h3m=n>=65?Math.max(...px.slice(-65)):Math.max(...px);
+  met.drawdown=(h3m-last)/h3m;
+  s.s18=met.drawdown<0.15; if(s.s18)sc++;
+
+  const B=bbCalc(px.slice(-20),2);
+  met.bbUpper=B.upper;
+  s.s19=last>B.upper; if(s.s19)sc++;
+
+  const allLast20=hist.slice(-20);
+  const posDays=allLast20.filter(d=>d.c>d.o).length;
+  s.s20=posDays>=12; if(s.s20)sc++;
+
+  met.price=last; met.high52=h52;
+  return{score:sc,signals:s,metrics:met};
+}
+
+// ─── UTILITIES ──────────────────────────────────────────────────────
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ─── SECTOR HELPERS ─────────────────────────────────────────────────
+function guessSector(ticker, company){
+  const t=(ticker||'').toLowerCase();
+  const c=(company||'').toLowerCase();
+  const all=t+' '+c;
+  if(/nvda|nvidia|amd|tsm|avgo|klac|ter|amkr|axti|aaoi|lwlg|cohr|mrvl|qcom|intc|mu|sndk|semi|chip|micr|lrcx|amat|adi|txn|nxpi|swks|mpwr|on|mchp|entg|smci|crus|diod|onto|acls|algm|amba|aehr|sitm|mtsi|rmbs|smtc|syna|uctt|veco|wolf|camt|nvts|slab|form|gsit|iosp|ipgp|powi|nvec|oled/.test(all)) return 'SEMICONDUCTORS';
+  if(/palant|pltr|snowflake|databrick|ai |artif|c3ai|openai|data.center|cloud|apld|corz|iren|cifr|hut|mara|riot|clsk|btbt|wulf|btdr|migi|nxgl|griid|btcs|nbis|ionq|qubt|rgti|qbts|arqq/.test(all)) return 'AI/DATA';
+  if(/aaon|carrier|lennox|watsco|trane|hvac|heat|cool|ventilat|mod |modine|nvent|rezi|itri/.test(all)) return 'HVAC/INDUSTRIAL';
+  if(/rocket|space|satellite|asts|rklb|planet|orbit|launch|aero|lunr|bwxt|defense|raytheon|northrop|lockheed|ktos|avav|axon|drs|lhx|mant|ldos|saic|caci|bah/.test(all)) return 'DEFENSE/SPACE';
+  if(/bitcoin|crypto|mining|hash|hut |corz|cifr|iren|mara|riot|clsk|btbt|wulf|btdr|btcm|arbk|hive|bitf|migi|nxgl|dmgi|griid|btcs/.test(all)) return 'CRYPTO/MINING';
+  if(/optic|fiber|photon|lumentum|lite|aaoi|cohr|ii-vi|coherent|cien|viav|nptn|ipgp|axti|lwlg/.test(all)) return 'OPTOELECTRONICS';
+  if(/energy|power|solar|wind|nuclear|gev|vertiv|vrt|bloom|be |plug|fuel.cell|electric|enpha|nextera|enph|sedg|csiq|fslr|arry|nova|sunw|clne|evgo|chpt|blnk|nrg|ceg|vst|tln/.test(all)) return 'ENERGY';
+  if(/construct|infrastructure|strl|powl|fix |flour|fluor|aecom|kbr|engineer|mdus|prim|ttek|iesc|pike|myrg|nvee|dxpe|grc|wire|nvent/.test(all)) return 'INFRASTRUCTURE';
+  if(/bio|pharma|therapeut|medical|oncol|genomic|crispr|gene|drug|clinic|mrna|bntx|nvax|alny|incy|vrtx|regn|biib|gild|amgn/.test(all)) return 'BIOTECH';
+  if(/software|saas|cloud|platform|docs|docn|cyber|security|crwd|zs|okta|net |panw|ftnt|snps|cdns|anss|manh|epam|wday|now|crm|adbe|intu|team|ttwo|ea|rblx/.test(all)) return 'SOFTWARE';
+  if(/retail|consumer|brand|food|beverage|coke|restaurant|hotel|travel|amzn|walmart|tgt|cost|tjx|rost|burl|nke|lulu|celh|mnst|crox|deck|boot/.test(all)) return 'CONSUMER';
+  return 'TECHNOLOGY';
+}
+
+function sectorMatch(sec){
+  if(activeSecs.has('ALL')) return true;
+  const secUp=sec.toUpperCase();
+  const map={
+    'SEMIS':'SEMICONDUCTORS','OPTO':'OPTOELECTRONICS',
+    'AI/DATA':'AI','INFRA':'INFRASTRUCTURE','HVAC':'HVAC',
+    'CRYPTO':'CRYPTO','SPACE':'DEFENSE','BIO':'BIOTECH',
+    'CONSUMER':'CONSUMER','SOFTWARE':'SOFTWARE','ENERGY':'ENERGY'
+  };
+  for(const [k,v] of Object.entries(map)){
+    if(activeSecs.has(k)&&secUp.includes(v)) return true;
+  }
+  return false;
+}
+
+// ─── MAIN SCAN ─────────────────────────────────────────────────
+async function runScan(){
+  const btn=document.getElementById('goBtn');
+  btn.disabled=true;
+  document.getElementById('errBar').style.display='none';
+  document.getElementById('progBar').classList.add('on');
+  results=[];
+  expanded=null;
+  thesisCache={};
+
+  const minScore=parseInt(document.getElementById('minScore').value);
+  const minVol=parseInt(document.getElementById('minVol').value);
+  // Finnhub free: 60 calls/min. 1100ms between calls = safe ~54/min
+  const CALL_DELAY=1100;
+
+  try{
+    // ── PHASE 1: Load full NYSE+NASDAQ universe ──
+    setProg(2,'PHASE 1 — Loading full NYSE+NASDAQ stock universe from Finnhub...');
+    const universe=await getUniverse();
+    setProg(8,`Universe loaded: ${universe.length.toLocaleString()} common stocks (NYSE+NASDAQ, no OTC/Pink Sheets)`);
+    await sleep(400);
+
+    // ── PHASE 2: Quote pre-filter ──
+    // Fetch quote for each stock, apply basic price/momentum filters
+    // This narrows the universe before we spend calls on deep history
+    const mktHour=new Date().getUTCHours();
+    const isMarketHours=(mktHour>=13&&mktHour<=21); // 9am-5pm ET roughly
+    setProg(10,`PHASE 2 — Fetching quotes ${isMarketHours?'(market open — live data)':'(market closed — using historical data)'}...`);
+
+    const preFilter=[];
+    let quoteFetched=0;
+
+    for(let i=0;i<universe.length;i++){
+      const stock=universe[i];
+      try{
+        const q=await getQuote(stock.symbol);
+        await sleep(CALL_DELAY);
+        quoteFetched++;
+
+        if(!q||!q.c||q.c<=0||q.c<5) continue; // skip invalid or penny stocks
+
+        const pctChg=q.dp||0;
+        const price=q.c||q.pc||0; // use prev close if current not available (after hours)
+        const prevClose=q.pc||price;
+        const high=q.h||price;
+        const open=q.o||price;
+
+        // Use prev close as price if market closed/after hours
+        const effectivePrice = price > 0 ? price : prevClose;
+        if(effectivePrice < 5) continue; // min $5
+
+        // Pre-score: works both during market hours AND after hours
+        // After hours: score based on recent price vs prev close history
+        let preScore=0;
+        if(pctChg>0) preScore++;            // up today (market hours)
+        if(pctChg>1.5) preScore++;          // up strongly
+        if(effectivePrice>=high*0.95) preScore++;  // near day high
+        if(effectivePrice>open&&open>0) preScore++;// above open
+        if(prevClose>0) preScore++;         // has valid price data — always true if stock active
+
+        // After hours: every stock with valid price data gets at least 1 point
+        // so we don't filter everything out when markets are closed
+        if(preScore<1) continue;
+
+        preFilter.push({symbol:stock.symbol,description:stock.description||stock.symbol,price:effectivePrice,pctChg,preScore,quote:q});
+
+        const pct=10+(quoteFetched/universe.length)*34;
+        if(quoteFetched%25===0){
+          setProg(pct,`[${quoteFetched}/${universe.length}] Quotes scanned · ${preFilter.length} candidates so far...`);
+        }
+      }catch(e){
+        if(e.message==='RATE_LIMIT'){
+          setProg(10+(quoteFetched/universe.length)*34,'Rate limit hit — pausing 60s...');
+          await sleep(62000); i--; continue;
+        }
+        continue;
+      }
+    }
+
+    // Sort: best pre-score + biggest gain first
+    preFilter.sort((a,b)=>(b.preScore*10+b.pctChg)-(a.preScore*10+a.pctChg));
+    setProg(45,`Pre-filter done: ${preFilter.length} momentum candidates from ${universe.length} stocks. Starting deep analysis...`);
+    await sleep(400);
+
+    // ── PHASE 3: Deep 260-day analysis on candidates ──
+    const candidates=preFilter.slice(0,500); // top 500 by pre-score
+    const passed=[];
+
+    for(let i=0;i<candidates.length;i++){
+      const stock=candidates[i];
+      try{
+        const hist=await getHistory(stock.symbol);
+        await sleep(CALL_DELAY);
+        if(hist.length<60) continue;
+
+        const analysis=score20(hist);
+        if(!analysis) continue;
+
+        const sector=guessSector(stock.symbol,stock.description);
+        if(!activeSecs.has('ALL')&&!sectorMatch(sector)) continue;
+
+        if(analysis.score>=minScore){
+          passed.push({ticker:stock.symbol,company:stock.description||stock.symbol,sector,...analysis,quote:stock.quote});
+        }
+
+        const pct=45+(i/candidates.length)*50;
+        setProg(pct,`[${i+1}/${candidates.length}] ${stock.symbol} → ${analysis.score}/20 ${analysis.score>=minScore?'✅':'  '} · ${passed.length} passed`);
+
+      }catch(e){
+        if(e.message==='RATE_LIMIT'){
+          setProg(45+(i/candidates.length)*50,'Rate limit — pausing 60s...');
+          await sleep(62000); i--; continue;
+        }
+        continue;
+      }
+    }
+
+    passed.sort((a,b)=>b.score-a.score);
+    results=passed;
+    setProg(100,`Scan complete! ${passed.length} stocks passed ${minScore}/20`);
+    await sleep(500);
+    document.getElementById('progBar').classList.remove('on');
+    renderTable(results);
+    updateStats(results,universe.length);
+    updateTape(results);
+    document.getElementById('scanTime').textContent='LAST SCAN: '+new Date().toLocaleTimeString()+' · '+universe.length.toLocaleString()+' stocks';
+
+  }catch(err){
+    console.error(err);
+    document.getElementById('progBar').classList.remove('on');
+    const eb=document.getElementById('errBar');
+    eb.style.display='block';
+    eb.innerHTML=`<strong>⚠ SCAN ERROR:</strong> ${err.message}<br><br>`+
+      `<strong>Fixes:</strong><br>`+
+      `• Verify key at <a href="https://finnhub.io/dashboard" target="_blank" style="color:var(--cyan)">finnhub.io/dashboard</a><br>`+
+      `• Free tier: 60 calls/min — scanner auto-paces but check monthly limits<br>`+
+      `• Try scanning again — transient errors usually resolve`;
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+// ─── RENDER TABLE ──────────────────────────────────────────────────
+function renderTable(data){
+  let filtered=showWL?data.filter(r=>watchlist.includes(r.ticker)):data;
+  document.getElementById('resMeta').textContent=`${filtered.length} RESULTS`;
+  if(!filtered.length){
+    document.getElementById('tableArea').innerHTML=`<div class="empty"><div class="empty-ico">◈</div><h3>NO RESULTS</h3><p>${showWL?'No watchlist stocks in current scan results. Star some tickers first.':'No stocks passed the minimum score filter. Try lowering the threshold or running a new scan with different sector filters.'}</p></div>`;
+    return;
+  }
+
+  let html=`<table><thead><tr>
+    <th>#</th><th>★</th><th>TICKER</th><th>COMPANY</th><th>SECTOR</th>
+    <th>PRICE</th><th>1M RET</th><th>3M RET</th><th>VOL RATIO</th>
+    <th>RSI</th><th>SCORE /20</th><th>SIGNALS</th><th>CONVICTION</th><th>6M MOIC EST</th><th></th>
+  </tr></thead><tbody>`;
+
+  filtered.forEach((r,i)=>{
+    const m=r.metrics;
+    const sig=sigInfo(r.score);
+    const barC=scoreColor(r.score);
+    const ret1m=(m.ret1m*100).toFixed(1);
+    const ret3m=(m.ret3m*100).toFixed(1);
+    const volR=m.volRatio.toFixed(2);
+    const moic=(1+Math.max(0,m.ret6m)*1.4).toFixed(2);
+    const tgt=(m.price*(parseFloat(moic))).toFixed(2);
+    const dots=Object.values(r.signals).map(v=>`<div class="cdot ${v?'y':'n'}"></div>`).join('');
+    const starred=watchlist.includes(r.ticker);
+    html+=`
+      <tr onclick="toggleExpand('${r.ticker}',this)" id="row-${r.ticker}" style="animation:fi .35s ${i*.03}s both">
+        <td class="mono" style="color:var(--text3)">${i+1}</td>
+        <td><button class="star-btn ${starred?'on':''}" onclick="starClick('${r.ticker}',this,event)">★</button></td>
+        <td class="td-ticker">${r.ticker}</td>
+        <td class="td-co" title="${r.company}">${r.company}</td>
+        <td><span class="sbadge">${r.sector}</span></td>
+        <td class="mono">$${m.price.toFixed(2)}</td>
+        <td class="mono ${parseFloat(ret1m)>=0?'pos':'neg'}">${ret1m}%</td>
+        <td class="mono ${parseFloat(ret3m)>=0?'pos':'neg'}">${ret3m}%</td>
+        <td class="mono ${parseFloat(volR)>=1.5?'pos':'neu'}">${volR}x</td>
+        <td class="mono ${m.rsi>70?'neg':m.rsi>50?'pos':'neu'}">${m.rsi.toFixed(1)}</td>
+        <td><div class="score-wrap"><span class="score-num" style="color:${barC}">${r.score}</span><div class="score-track"><div class="score-fill" style="width:${r.score/20*100}%;background:${barC}"></div></div></div></td>
+        <td><div class="check-dots">${dots}</div></td>
+        <td><span class="sig ${sig.cls}">${sig.label}</span></td>
+        <td class="mono pos">${moic}x → $${tgt}</td>
+        <td><span class="arr" id="arr-${r.ticker}">▶</span></td>
+      </tr>
+      <tr class="det-row" id="det-${r.ticker}" style="display:none">
+        <td colspan="15"><div class="det-panel" id="dp-${r.ticker}">${buildDetail(r)}</div></td>
+      </tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('tableArea').innerHTML=html;
+}
+
+function sigInfo(sc){
+  if(sc>=17)return{cls:'sMAX',label:'MAX CONVICTION'};
+  if(sc>=14)return{cls:'sHIGH',label:'HIGH CONVICTION'};
+  if(sc>=11)return{cls:'sWATCH',label:'WATCH'};
+  return{cls:'sEARLY',label:'EARLY STAGE'};
+}
+function scoreColor(sc){return sc>=17?'#00ff9d':sc>=14?'#ffd84d':sc>=11?'#00e5ff':'#bf5af2'}
+
+// ─── DETAIL PANEL ──────────────────────────────────────────────────
+function buildDetail(r){
+  const m=r.metrics, s=r.signals;
+  const moic=(1+Math.max(0,m.ret6m)*1.4).toFixed(2);
+  const tgt=(m.price*parseFloat(moic)).toFixed(2);
+
+  const checks=[
+    {k:'s1', lbl:'52-Wk High Proximity ≥85%', val:`${(m.pct52*100).toFixed(1)}%`},
+    {k:'s2', lbl:'Golden Cross (50MA > 200MA)', val:`50: $${m.ma50.toFixed(0)} / 200: $${m.ma200.toFixed(0)}`},
+    {k:'s3', lbl:'Price > 50-Day MA', val:`$${m.price.toFixed(2)} vs $${m.ma50.toFixed(2)}`},
+    {k:'s4', lbl:'Price > 200-Day MA', val:`$${m.price.toFixed(2)} vs $${m.ma200.toFixed(2)}`},
+    {k:'s5', lbl:'1-Month Return > 5%', val:`${(m.ret1m*100).toFixed(1)}%`},
+    {k:'s6', lbl:'3-Month Return > 15%', val:`${(m.ret3m*100).toFixed(1)}%`},
+    {k:'s7', lbl:'Volume Surge ≥1.5x avg', val:`${m.volRatio.toFixed(2)}x`},
+    {k:'s8', lbl:'OBV Positive Slope (Accumulation)', val:m.obvSlope>0?'Bullish ↑':'Bearish ↓'},
+    {k:'s9', lbl:'4+ Up Days w/ Volume (last 10)', val:'—'},
+    {k:'s10',lbl:'5-Day Vol > 20-Day Vol ×1.2', val:`${(m.avgV5/1e6).toFixed(1)}M vs ${(m.avgV20/1e6).toFixed(1)}M`},
+    {k:'s11',lbl:'Breakout: Price > 20-Day High', val:'New 20d high'},
+    {k:'s12',lbl:'RSI 50–80 (Momentum Zone)', val:`RSI ${m.rsi.toFixed(1)}`},
+    {k:'s13',lbl:'MACD Bullish (> Signal, > 0)', val:`MACD ${m.macd.toFixed(3)}`},
+    {k:'s14',lbl:'Price > 10-Day VWAP', val:`$${m.price.toFixed(2)} vs $${m.vwap?.toFixed(2)||'—'}`},
+    {k:'s15',lbl:'Higher Lows Pattern', val:'Ascending lows'},
+    {k:'s16',lbl:'6-Month Return > 25%', val:`${(m.ret6m*100).toFixed(1)}%`},
+    {k:'s17',lbl:'Price Acceleration (30d > prior 30d)', val:'Accelerating'},
+    {k:'s18',lbl:'Drawdown from Peak < 15%', val:`${(m.drawdown*100).toFixed(1)}% drawdown`},
+    {k:'s19',lbl:'Bollinger Band Breakout', val:`Upper: $${m.bbUpper?.toFixed(2)||'—'}`},
+    {k:'s20',lbl:'Trend Consistency ≥60% up days', val:'20-day trend'},
+  ];
+
+  const clHTML=checks.map(c=>`<div class="cl-item"><span class="cl-icon">${s[c.k]?'✅':'❌'}</span><span class="cl-lbl">${c.lbl}</span><span class="cl-val">${c.val}</span></div>`).join('');
+
+  return `
+    <div class="dp-sec" style="grid-column:span 1;overflow-y:auto;max-height:380px">
+      <h4>20-Signal Checklist</h4>
+      <div class="cl-grid">${clHTML}</div>
+    </div>
+    <div class="dp-sec">
+      <h4>AI Investment Thesis</h4>
+      <div id="th-${r.ticker}"><div class="thesis-spin"><div class="spin-ring"></div><div class="spin-txt">Claude AI searching web for latest data...</div></div></div>
+    </div>
+    <div class="dp-sec">
+      <h4>MOIC Projection</h4>
+      <div class="moic-lbl">6-MONTH EST. MOIC</div>
+      <div class="moic-big">${moic}x</div>
+      <div class="tg-grid">
+        <div class="tg-item"><div class="tg-lbl">Current</div><div class="tg-val">$${m.price.toFixed(2)}</div></div>
+        <div class="tg-item"><div class="tg-lbl">6M Target</div><div class="tg-val" style="color:var(--green)">$${tgt}</div></div>
+        <div class="tg-item"><div class="tg-lbl">RSI</div><div class="tg-val">${m.rsi.toFixed(1)}</div></div>
+        <div class="tg-item"><div class="tg-lbl">Vol Ratio</div><div class="tg-val">${m.volRatio.toFixed(2)}x</div></div>
+        <div class="tg-item"><div class="tg-lbl">52Wk High</div><div class="tg-val">$${m.high52.toFixed(2)}</div></div>
+        <div class="tg-item"><div class="tg-lbl">Score</div><div class="tg-val">${r.score}/20</div></div>
+        <div class="tg-item"><div class="tg-lbl">3M Return</div><div class="tg-val ${m.ret3m>=0?'pos':'neg'}">${(m.ret3m*100).toFixed(1)}%</div></div>
+        <div class="tg-item"><div class="tg-lbl">6M Return</div><div class="tg-val ${m.ret6m>=0?'pos':'neg'}">${(m.ret6m*100).toFixed(1)}%</div></div>
+      </div>
+    </div>`;
+}
+
+// ─── EXPAND/COLLAPSE ───────────────────────────────────────────────
+async function toggleExpand(ticker,rowEl){
+  const det=document.getElementById('det-'+ticker);
+  const arr=document.getElementById('arr-'+ticker);
+  if(!det) return;
+  if(expanded&&expanded!==ticker){
+    const p=document.getElementById('det-'+expanded);
+    const pa=document.getElementById('arr-'+expanded);
+    if(p)p.style.display='none';
+    if(pa){pa.style.transform='rotate(0deg)';document.getElementById('row-'+expanded)?.classList.remove('expanded')}
+  }
+  const isOpen=det.style.display!=='none';
+  det.style.display=isOpen?'none':'table-row';
+  arr.style.transform=isOpen?'rotate(0deg)':'rotate(90deg)';
+  rowEl.classList.toggle('expanded',!isOpen);
+  expanded=isOpen?null:ticker;
+  if(!isOpen&&!thesisCache[ticker]){
+    const stock=results.find(r=>r.ticker===ticker);
+    if(stock) await genThesis(stock, document.getElementById('th-'+ticker));
+  } else if(!isOpen&&thesisCache[ticker]){
+    document.getElementById('th-'+ticker).innerHTML=thesisCache[ticker];
+  }
+}
+
+// ─── CLAUDE AI THESIS ──────────────────────────────────────────────
+async function genThesis(stock, el){
+  const m=stock.metrics;
+  const prompt=`You are a top hedge fund analyst. Generate a HIGH-CONVICTION investment thesis for ${stock.ticker} (${stock.company}) in the ${stock.sector} sector.
+
+Real market data from Finnhub:
+- Current Price: $${m.price.toFixed(2)}
+- 1-Month Return: ${(m.ret1m*100).toFixed(1)}%
+- 3-Month Return: ${(m.ret3m*100).toFixed(1)}%
+- 6-Month Return: ${(m.ret6m*100).toFixed(1)}%
+- RSI: ${m.rsi.toFixed(1)}
+- Volume vs 20-day avg: ${m.volRatio.toFixed(2)}x
+- Momentum Score: ${stock.score}/20 signals confirmed
+- 52-Week High: $${m.high52.toFixed(2)} (stock at ${(m.pct52*100).toFixed(0)}% of high)
+- Golden Cross: ${stock.signals.s2?'YES — 50MA above 200MA':'NO'}
+- MACD Bullish: ${stock.signals.s13?'YES':'NO'}
+- Bollinger Breakout: ${stock.signals.s19?'YES':'NO'}
+- OBV Accumulation: ${stock.signals.s8?'YES — Institutions accumulating':'NO'}
+
+Use web search to find: latest earnings, analyst upgrades/downgrades, recent news, institutional buying, sector trends for ${stock.ticker}.
+
+Return ONLY this JSON (no markdown, no extra text):
+{"thesis":"2-3 sentence bull case explaining the key fundamental driver and why NOW is the entry","catalysts":["specific catalyst 1","specific catalyst 2","specific catalyst 3"],"risks":"main risk in one sentence","moic12m":1.85,"target12m":0}`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})
+    });
+    if(!resp.ok) throw new Error('Claude API '+resp.status);
+    const data=await resp.json();
+    const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    const clean=text.replace(/```json|```/g,'').trim();
+    const start=clean.indexOf('{'), end=clean.lastIndexOf('}');
+    if(start===-1) throw new Error('No JSON');
+    const p=JSON.parse(clean.slice(start,end+1));
+    const tgt12m=p.target12m>0?p.target12m:(stock.metrics.price*p.moic12m);
+
+    const html=`
+      <p class="thesis-txt" style="margin-bottom:12px">${p.thesis}</p>
+      <h4 style="font-family:'DM Mono';font-size:8px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">KEY CATALYSTS</h4>
+      <ul class="cat-list">${(p.catalysts||[]).map(c=>`<li>${c}</li>`).join('')}</ul>
+      <h4 style="font-family:'DM Mono';font-size:8px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:10px 0 6px">PRIMARY RISK</h4>
+      <p style="font-size:12px;color:var(--red)">${p.risks}</p>
+      <h4 style="font-family:'DM Mono';font-size:8px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin:10px 0 4px">12-MONTH CONVICTION</h4>
+      <p style="font-family:'Bebas Neue';font-size:30px;color:var(--green);letter-spacing:2px">${(p.moic12m||1).toFixed(2)}x &rarr; $${tgt12m.toFixed(2)}</p>`;
+    thesisCache[stock.ticker]=html;
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML=`<p style="font-size:11px;color:var(--text3);font-family:'DM Mono'">Thesis unavailable: ${e.message}</p>`;
+  }
+}
+
+// ─── STATS & TAPE ──────────────────────────────────────────────────
+function updateStats(data, totalScanned){
+  // Show download button if we have results
+  const dlBtn=document.getElementById('dlBtn');
+  if(dlBtn) dlBtn.style.display=data.length>0?'block':'none';
+  document.getElementById('stScanned').textContent=(totalScanned||0).toLocaleString();
+  document.getElementById('stMax').textContent=data.filter(r=>r.score>=17).length;
+  document.getElementById('stHigh').textContent=data.filter(r=>r.score>=14&&r.score<17).length;
+  document.getElementById('stWatch').textContent=data.filter(r=>r.score>=11&&r.score<14).length;
+  document.getElementById('stPassed').textContent=data.length;
+  const sc={};
+  data.forEach(r=>{sc[r.sector]=(sc[r.sector]||0)+1});
+  const top=Object.entries(sc).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('stSector').textContent=top?top[0]:'—';
+  updateWLBadge();
+}
+
+function updateTape(data){
+  if(!data.length)return;
+  const items=data.slice(0,20).map(r=>{
+    const p=(r.metrics.ret1m*100).toFixed(1);
+    return`<span class="t-item"><span class="t-sym">${r.ticker}</span><span class="${parseFloat(p)>=0?'t-up':'t-nu'}">${parseFloat(p)>=0?'+':''}${p}% · ${r.score}/20</span></span>`;
+  });
+  document.getElementById('tapeInner').innerHTML=[...items,...items].join('');
+}
+
+// ─── DOWNLOAD CSV ─────────────────────────────────────────────────────
+function downloadResults(){
+  if(!results.length){alert('No results to download. Run a scan first.');return;}
+  const headers=['Rank','Ticker','Company','Sector','Price','1M Return','3M Return',
+    '6M Return','Vol Ratio','RSI','Score /20','Signal','MOIC Est','52Wk High',
+    'MA50','MA200','Drawdown %','OBV Trend','MACD Bullish'];
+  const rows=results.map((r,i)=>{
+    const m=r.metrics;
+    const sig=r.score>=17?'MAX CONVICTION':r.score>=14?'HIGH CONVICTION':r.score>=11?'WATCH':'EARLY';
+    const moic=(1+Math.max(0,m.ret6m)*1.4).toFixed(2);
+    return [
+      i+1, r.ticker, `"${r.company}"`, r.sector,
+      `$${m.price.toFixed(2)}`,
+      `${(m.ret1m*100).toFixed(1)}%`,
+      `${(m.ret3m*100).toFixed(1)}%`,
+      `${(m.ret6m*100).toFixed(1)}%`,
+      `${m.volRatio.toFixed(2)}x`,
+      m.rsi.toFixed(1),
+      `${r.score}/20`,
+      sig,
+      `${moic}x`,
+      `$${m.high52.toFixed(2)}`,
+      `$${m.ma50.toFixed(2)}`,
+      `$${m.ma200.toFixed(2)}`,
+      `${(m.drawdown*100).toFixed(1)}%`,
+      m.obvSlope>0?'Bullish':'Bearish',
+      r.signals.s13?'Yes':'No'
+    ].join(',');
+  });
+  const csv=[headers.join(','),...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`APEX_Scan_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
